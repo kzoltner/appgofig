@@ -8,3 +8,6 @@ Using a struct (and some maps) as single source of truth to add configuration to
 # How to use
 
 [TODO]
+
+Test commit :)
+Test Commit 2
