@@ -35,7 +35,7 @@ if err != nil {
 }
 ```
 
-Next, actuall initialize the config by calling `Init()` - only now values are added:
+Next, actually initialize the config by calling `Init()` - only now values are added:
 
 ```go
 // Initialize it, which actually reads the values
@@ -51,3 +51,22 @@ cfg := gofig.GetConfig()
 ```
 
 This should now have all the fields from the Config struct but with values added.
+
+# The `Config` struct
+
+The `Config` struct determines your whole configuration. You can name it whatever you want.
+The following tags are usable
+
+| Tag Name  | Content                                                                             |
+| --------- | ----------------------------------------------------------------------------------- |
+| `env`     | Key used for Environment Variables. If this is empty, it defaults to the field name |
+| `default` | String representation of a default value. Otherwise an empty string is used.        |
+| `req`     | If set to "true", this config setting cannot be empty                               |
+
+Example entry:
+
+```go
+type Config struct {
+	MyOwnSetting string `"env":"ENV_MY_OWN_SETTING" "default":"myDefaultValue" "required":"true"`
+}
+```
