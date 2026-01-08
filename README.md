@@ -67,6 +67,6 @@ Example entry:
 
 ```go
 type Config struct {
-	MyOwnSetting string `"env":"ENV_MY_OWN_SETTING" "default":"myDefaultValue" "required":"true"`
+	MyOwnSetting string `env:"ENV_MY_OWN_SETTING" default:"myDefaultValue" required:"true"`
 }
 ```
