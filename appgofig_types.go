@@ -3,7 +3,7 @@ package appgofig
 import "reflect"
 
 type AppGofig[T StructOnly] struct {
-	Cfg          T
+	Cfg          *T
 	Descriptions map[string]string
 }
 
@@ -17,6 +17,4 @@ type ConfigEntry struct {
 	Value    any
 }
 
-type StructOnly interface {
-	~struct{}
-}
+type StructOnly any

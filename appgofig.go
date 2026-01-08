@@ -10,13 +10,21 @@ import (
 )
 
 // NewAppGofig Creates a new AppGofig. You need to Initialize it using .Init() on the return value
-func NewAppGofig[T StructOnly](configDescriptions map[string]string) *AppGofig[T] {
-	gofig := AppGofig[T]{
-		Descriptions: configDescriptions,
-		Cfg:          T{},
+func NewAppGofig[T StructOnly](configDescriptions map[string]string) (*AppGofig[T], error) {
+	configType := reflect.TypeFor[T]()
+
+	if configType.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("incompatible type for config")
 	}
 
-	return &gofig
+	configInstance := reflect.New(configType).Elem().Interface().(T)
+
+	gofig := AppGofig[T]{
+		Descriptions: configDescriptions,
+		Cfg:          &configInstance,
+	}
+
+	return &gofig, nil
 }
 
 // CreateMarkdownFile creates a simple markdown table with information about the provided config inputs
@@ -80,7 +88,7 @@ func CreateYamlExampleFile[T StructOnly](yamlExampleFilePath string, configDescr
 
 		// Write Row
 		fmt.Fprintf(&sb, "# %s [%s%s] - %s \n", yamlKey, field.Type.Kind().String(), required, description)
-		fmt.Fprintf(&sb, "%s:%s\n\n", yamlKey, defaultValue)
+		fmt.Fprintf(&sb, "%s: %s\n\n", yamlKey, defaultValue)
 	}
 
 	configExampleYaml, err := os.Create(yamlExampleFilePath)
@@ -137,7 +145,7 @@ func (gofig *AppGofig[T]) InitWithTestValues(values map[string]string) error {
 }
 
 // GetConfig returns the actual Config Struct
-func (gofig *AppGofig[T]) GetConfig() T {
+func (gofig *AppGofig[T]) GetConfig() *T {
 	return gofig.Cfg
 }
 
@@ -146,7 +154,7 @@ func (gofig *AppGofig[T]) LogToConsole() {
 	log.Println("### AppGofig Configuration Start ###")
 
 	t := reflect.TypeFor[T]()
-	v := reflect.ValueOf(gofig.Cfg)
+	v := reflect.ValueOf(gofig.Cfg).Elem()
 
 	for k := 0; k < t.NumField(); k++ {
 		field := t.Field(k)
@@ -159,7 +167,7 @@ func (gofig *AppGofig[T]) LogToConsole() {
 			stringVal = fmt.Sprintf("[Masked - Length: %d]", len(stringVal))
 		}
 
-		log.Printf(" | %s : %s\n", key, stringVal)
+		log.Printf("#| %s : %s\n", key, stringVal)
 	}
 
 	log.Println("### AppGofig Configuration End ###")
@@ -195,6 +203,8 @@ func (gofig *AppGofig[T]) applyConfigEntries(configEntries map[string]*ConfigEnt
 	for k := 0; k < confTypes.NumField(); k++ {
 		field := confTypes.Field(k)
 		val := confValues.Field(k)
+
+		log.Println(val)
 
 		switch field.Type.Kind() {
 		case reflect.String:
