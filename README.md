@@ -3,7 +3,7 @@
 Using a struct (and one description map) as single source of truth to add configuration to Go applications.
 
 > [!note]
-> This is a very simplistic approach to adding configuration to your applications. It is intended to be one step above just using a config map or something similar.
+> This is a very simplistic approach to adding simple key:value pair style configuration to your applications. Nothing more, nothing less.
 
 # Install
 
@@ -34,7 +34,7 @@ Next, instantiate your config and then read the config values by calling `ReadCo
 ```go
 cfg := &Config{}
 
-if err := appgofig.ReadConfig(cfg, appgofig.ReadModeEnvThenYaml); err != nil {
+if err := appgofig.ReadConfig(cfg); err != nil {
 	log.Fatal(err)
 }
 
@@ -47,30 +47,16 @@ Now, using your config should be as easy as accessing the struct itself:
 log.Println(cfg.MyOwnSetting)
 ```
 
-## Using `yaml`
-The `ReadConfig()` method accepts a third parameter for you to specify a yaml file path to use:
-
-```go
-appgofig.ReadConfig(cfg, appgofig.ReadModeEnvThenYaml, "./my_yaml.yml")
-```
-
-More than one yaml path is not allowed.
-
-If no path is provided, these paths are used in order (first hit gets the win):
-```go
-defaultYamlPaths := []string{"config.yml", "config.yaml", "config/config.yml", "config/config.yaml"}
-```
-
 ## The `Config` struct
 
 The `Config` struct determines your whole configuration. You can name it whatever you want.
 The following tags are usable:
 
-| Tag Name  | Content                                                                               |
-| --------- | ------------------------------------------------------------------------------------- |
-| `env`     | Key used for Environment Variables. If this is empty, it defaults to the field name   |
-| `default` | String representation of a default value. Otherwise an empty string is used.          |
-| `req`     | If set to "true", this config setting cannot be empty. Only applies to string values. |
+| Tag Name  | Content                                                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `env`     | Key used for Environment Variables. If this is empty, it defaults to the field name                                       |
+| `default` | String representation of a default value. Otherwise an empty string is used.                                              |
+| `req`     | If set to "true", this config setting cannot be empty. Only applies to string values and is ignored on non-string values. |
 
 Example entry:
 
@@ -83,22 +69,47 @@ type Config struct {
 > [!important]
 > Due to my own needs, only four types are allowed: `string`, `int64`, `float64` and `bool`.
 
-## ReadModes
+## Available Options
+
+The `ReadConfig()` method has a second parameter for `With...()` option functions.
+The following are available:
+
+- `WithReadMode(readMode ConfigReadMode)` to set a read mode
+- `WithYamlFile(filePath string)` to set a specific YAML file
+- `WithNewDefaults(newDefaults map[string]string)` to set new defaults (e.g. for testing)
+
+Check the `example` folder on how to use them.
+
+### ReadModes
 
 There are four read modes available:
 
-| ReadMode                     | Description                                                          |
-| ---------------------------- | -------------------------------------------------------------------- |
-| `appgofig.ReadModeEnvOnly`     | Only uses environment to read values                                 |
-| `appgofig.ReadModeYamlOnly`    | Only use yaml file                                                   |
-| `appgofig.ReadModeEnvThenYaml` | First read env, then apply yaml (overwriting env values if present)  |
-| `appgofig.ReadModeYamlThenEnv` | First read yaml, then apply env (overwriting yaml values if present) |
+| ReadMode                       | Description                                                          |
+| ------------------------------ | -------------------------------------------------------------------- |
+| `appgofig.ReadModeEnvOnly`     | Only uses Environment to read values                                 |
+| `appgofig.ReadModeYamlOnly`    | Only uses a YAML file                                                |
+| `appgofig.ReadModeEnvThenYaml` | First read env, then apply YAML (overwriting env values if present)  |
+| `appgofig.ReadModeYamlThenEnv` | First read YAML, then apply env (overwriting YAML values if present) |
+
+### Using yaml files
+
+When no YAML file is specified using `WithYamlFile()`, but a YAML ReadMode is used, this list
+of paths is used to look for YAML files. First hit is used:
+
+```go
+defaultYamlPaths := []string{"config.yml", "config.yaml", "config/config.yml", "config/config.yaml"}
+```
+
+> [!important]
+> To keep it simple, only flat key:value pair YAMLs are allowed. No nesting should be there.
 
 # Documentation
+
 Two methods are provided to automatically create documentation about your configuration.
 Check the `example` folder for how they could look like.
 
-## Markdown 
+## Markdown
+
 Using `WriteToMarkdownFile()` you can generate a markdown file containing a simple table.
 
 ```go
@@ -108,6 +119,7 @@ if err := appgofig.WriteToMarkdownFile(cfg, configDescriptions, "example/Markdow
 ```
 
 ## Example config.yaml
+
 Similarly, using `WriteToYamlExampleFile()` will get you a config.yml example with comments explaining each entry
 
 ```go

@@ -8,8 +8,8 @@ import (
 )
 
 type Config struct {
-	MyOwnSetting    int64  `default:"10" env:"MY_OWN_SETTING"`
-	MyStringSetting string `default:"hello" env:"MY_STRING_SETTING" req:"true"`
+	MyOwnSetting    int64  `default:"42" env:"MY_OWN_SETTING"`
+	MyStringSetting string `default:"defaultStringSetting" env:"MY_STRING_SETTING" req:"true"`
 }
 
 var configDescriptions map[string]string = map[string]string{
@@ -20,14 +20,29 @@ var configDescriptions map[string]string = map[string]string{
 func main() {
 	cfg := &Config{}
 
-	if err := appgofig.ReadConfig(cfg, appgofig.ReadModeEnvThenYaml); err != nil {
+	// Standard way of using it
+	if err := appgofig.ReadConfig(cfg); err != nil {
+		log.Fatal(err)
+	}
+	appgofig.LogConfig(cfg, os.Stdout)
+
+	// documentation helper functions
+	appgofig.WriteToMarkdownFile(cfg, configDescriptions, "example/MarkdownExample.md")
+	appgofig.WriteToYamlExampleFile(cfg, configDescriptions, "example/ConfigYamlExample.yaml")
+
+	// showcasing all options
+	nextCfg := &Config{}
+
+	if err := appgofig.ReadConfig(
+		nextCfg,
+		appgofig.WithReadMode(appgofig.ReadModeEnvThenYaml),
+		appgofig.WithYamlFile("example/my_yaml.yml"),
+		appgofig.WithNewDefaults(map[string]string{
+			"MyOwnSetting": "1000",
+		}),
+	); err != nil {
 		log.Fatal(err)
 	}
 
-	appgofig.LogConfig(cfg, os.Stdout)
-
-	log.Println(cfg.MyOwnSetting)
-
-	appgofig.WriteToMarkdownFile(cfg, configDescriptions, "example/MarkdownExample.md")
-	appgofig.WriteToYamlExampleFile(cfg, configDescriptions, "example/ConfigYamlExample.yaml")
+	appgofig.LogConfig(nextCfg, os.Stdout)
 }

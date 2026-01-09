@@ -69,10 +69,10 @@ func applyEnvironmentToConfig(targetConfig any) error {
 }
 
 // applyYamlToConfig checks for (config/)config.y(a)ml files and applies the first one found to targetConfig
-func applyYamlToConfig(targetConfig any, yamlFile []string) error {
+func applyYamlToConfig(targetConfig any, gofigOptions *AppGofigOptions) error {
 	yamlFilePath := ""
-	if len(yamlFile) > 0 {
-		yamlFilePath = yamlFile[0]
+	if gofigOptions.YamlFileRequested {
+		yamlFilePath = gofigOptions.YamlFilePath
 	} else {
 		// check for a config.yml or config.yaml in root directory or within a config folder
 		// any value here overwrites the rest

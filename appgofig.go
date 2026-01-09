@@ -19,9 +19,40 @@ const (
 	ReadModeYamlThenEnv ConfigReadMode = "yaml-env"
 )
 
+type AppGofigOptions struct {
+	ReadMode          ConfigReadMode
+	YamlFilePath      string
+	YamlFileRequested bool
+	NewDefaults       map[string]string
+}
+
+type AppGofigOption func(*AppGofigOptions)
+
+// WithReadMode sets a read mode
+func WithReadMode(readMode ConfigReadMode) AppGofigOption {
+	return func(options *AppGofigOptions) {
+		options.ReadMode = readMode
+	}
+}
+
+// WithYamlFile specifies which yaml file to use
+func WithYamlFile(filePath string) AppGofigOption {
+	return func(options *AppGofigOptions) {
+		options.YamlFilePath = filePath
+		options.YamlFileRequested = true
+	}
+}
+
+// WithNewDefaults adds new default values to use
+func WithNewDefaults(newDefaults map[string]string) AppGofigOption {
+	return func(options *AppGofigOptions) {
+		options.NewDefaults = newDefaults
+	}
+}
+
 // ReadConfig takes your targetConfig struct, applies defaults and then applies values according to the readMode
 // Using yamlFile, you can specify a yaml file to read from. If not specified, one of ./(config/)config.y(a)ml is used
-func ReadConfig(targetConfig any, readMode ConfigReadMode, yamlFile ...string) error {
+func ReadConfig(targetConfig any, optionList ...AppGofigOption) error {
 	if targetConfig == nil {
 		return fmt.Errorf("targetConfig must not be nil")
 	}
@@ -30,24 +61,46 @@ func ReadConfig(targetConfig any, readMode ConfigReadMode, yamlFile ...string) e
 		return fmt.Errorf("targetConfig has to point to a struct")
 	}
 
-	if len(yamlFile) > 1 {
-		return fmt.Errorf("only one additional yaml file path is allowed.")
-	}
-
-	if len(yamlFile) == 1 && readMode == ReadModeEnvOnly {
-		return fmt.Errorf("in ReadModeEnvOnly, no additional yaml path is allowed.")
-	}
-
 	// check if only the supported config types are present
 	if err := onlyContainsSupportedTypes(targetConfig); err != nil {
 		return fmt.Errorf("targetConfig not valid: %w", err)
 	}
 
+	// apply the options
+	gofigOptions := &AppGofigOptions{
+		ReadMode:          ReadModeEnvThenYaml,
+		YamlFilePath:      "",
+		YamlFileRequested: false,
+		NewDefaults:       nil,
+	}
+
+	for _, opt := range optionList {
+		opt(gofigOptions)
+	}
+
+	if gofigOptions.YamlFileRequested {
+		if len(gofigOptions.YamlFilePath) == 0 {
+			return fmt.Errorf("the yaml file path cannot be empty")
+		}
+
+		if gofigOptions.ReadMode == ReadModeEnvOnly {
+			return fmt.Errorf("when using the ReadModeEnvOnly, no yaml file shall be specified")
+		}
+	}
+
 	// apply the default values first
-	applyDefaultsToConfig(targetConfig)
+	if gofigOptions.NewDefaults == nil {
+		if err := applyDefaultsToConfig(targetConfig); err != nil {
+			return fmt.Errorf("unable to apply defaults: %w", err)
+		}
+	} else {
+		if err := applyStringMapToConfig(targetConfig, gofigOptions.NewDefaults); err != nil {
+			return fmt.Errorf("unable to apply new defaults: %w", err)
+		}
+	}
 
 	// read the config according to the read mode
-	switch readMode {
+	switch gofigOptions.ReadMode {
 	case ReadModeEnvOnly:
 		// Only read from environment
 		if err := applyEnvironmentToConfig(targetConfig); err != nil {
@@ -55,7 +108,7 @@ func ReadConfig(targetConfig any, readMode ConfigReadMode, yamlFile ...string) e
 		}
 	case ReadModeYamlOnly:
 		// Only read from yaml file
-		if err := applyYamlToConfig(targetConfig, yamlFile); err != nil {
+		if err := applyYamlToConfig(targetConfig, gofigOptions); err != nil {
 			return fmt.Errorf("could not read config values from yaml: %w", err)
 		}
 	case ReadModeEnvThenYaml:
@@ -63,19 +116,19 @@ func ReadConfig(targetConfig any, readMode ConfigReadMode, yamlFile ...string) e
 		if err := applyEnvironmentToConfig(targetConfig); err != nil {
 			return fmt.Errorf("could not read config values from env: %w", err)
 		}
-		if err := applyYamlToConfig(targetConfig, yamlFile); err != nil {
+		if err := applyYamlToConfig(targetConfig, gofigOptions); err != nil {
 			return fmt.Errorf("could not read config values from yaml: %w", err)
 		}
 	case ReadModeYamlThenEnv:
 		// first read from yaml, then overwrite existing stuff from environment
-		if err := applyYamlToConfig(targetConfig, yamlFile); err != nil {
+		if err := applyYamlToConfig(targetConfig, gofigOptions); err != nil {
 			return fmt.Errorf("could not read config values from yaml: %w", err)
 		}
 		if err := applyEnvironmentToConfig(targetConfig); err != nil {
 			return fmt.Errorf("could not read config values from env: %w", err)
 		}
 	default:
-		return fmt.Errorf("invalid read mode %s", readMode)
+		return fmt.Errorf("invalid read mode %s", gofigOptions.ReadMode)
 	}
 
 	// check if all required keys are non-empty
