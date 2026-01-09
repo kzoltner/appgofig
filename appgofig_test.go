@@ -104,6 +104,16 @@ func TestLogMasking(t *testing.T) {
 	}
 }
 
+func TestInvalidReadModeYamlCombination(t *testing.T) {
+	resetEnv()
+
+	cfg := &TestConfig{}
+	err := ReadConfig(cfg, WithReadMode(ReadModeEnvOnly), WithYamlFile("config.yml"))
+	if err == nil {
+		t.Fatal("expected error, got none")
+	}
+}
+
 func TestYamlExampleAndMarkdownGeneration(t *testing.T) {
 	resetEnv()
 	cfg := &TestConfig{}
@@ -192,6 +202,31 @@ func TestReadModeYamlOnlyWithSpecifiedFile(t *testing.T) {
 
 	if cfg.IntVal != 2000 {
 		t.Errorf("expected IntVal=2000, got %d", cfg.IntVal)
+	}
+}
+
+func TestReadModeYamlOnlyWithInvalidFile(t *testing.T) {
+	resetEnv()
+	cfg := &TestConfig{}
+	if err := ReadConfig(cfg, WithReadMode(ReadModeYamlOnly), WithYamlFile("")); err == nil {
+		t.Fatal("expected error but got none")
+	}
+
+	if err := ReadConfig(cfg, WithReadMode(ReadModeYamlOnly), WithYamlFile("non-existing.yml")); err == nil {
+		t.Fatal("expected error but got none")
+	}
+
+	yamlFile, err := os.Create("my_own_file.yml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer os.Remove(yamlFile.Name())
+
+	invalidYaml := "# Missing colon after key\nStringVal \"missing_colon\"\n\n# Invalid indentation\nIntVal:\n  - 42\n   - 43\n\n# Unexpected character\nBoolVal: tru!!"
+	yamlFile.WriteString(invalidYaml)
+
+	if err := ReadConfig(cfg, WithReadMode(ReadModeYamlOnly), WithYamlFile("my_own_file.yml")); err == nil {
+		t.Fatal("expected error but got none")
 	}
 }
 
@@ -309,6 +344,19 @@ func TestIntParsingErrors(t *testing.T) {
 		t.Fatal("expected error for invalid int value, got nil")
 	}
 	if !strings.Contains(err.Error(), "cannot use notanumber as int") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestFloatParsingErrors(t *testing.T) {
+	resetEnv()
+	os.Setenv("TEST_FLOAT", "notanumber")
+	cfg := &TestConfig{}
+	err := ReadConfig(cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid int value, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot use notanumber as float") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
