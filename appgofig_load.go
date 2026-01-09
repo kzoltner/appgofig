@@ -34,9 +34,7 @@ func applyDefaultsToConfig(targetConfig any) error {
 func applyEnvironmentToConfig(targetConfig any) error {
 	// load .env
 	// error is ignored on purpose, as not having .env is not an issue
-	if err := godotenv.Load(); err != nil {
-		return nil
-	}
+	godotenv.Load()
 
 	// gather environment map
 	envMap := make(map[string]string)

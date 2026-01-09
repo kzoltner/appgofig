@@ -41,6 +41,9 @@ if err := appgofig.ReadConfig(cfg); err != nil {
 appgofig.LogConfig(cfg, os.Stdout)
 ```
 
+> [!caution]
+> Make sure to use a pointer to your struct, not the struct itself.
+
 Now, using your config should be as easy as accessing the struct itself:
 
 ```go
@@ -57,6 +60,7 @@ The following tags are usable:
 | `env`     | Key used for Environment Variables. If this is empty, it defaults to the field name                                       |
 | `default` | String representation of a default value. Otherwise an empty string is used.                                              |
 | `req`     | If set to "true", this config setting cannot be empty. Only applies to string values and is ignored on non-string values. |
+| `mask`    | If set to "true", this will mask the value of a field when using `LogConfig()`                                            |
 
 Example entry:
 

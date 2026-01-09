@@ -153,7 +153,7 @@ func LogConfig(targetConfig any, out io.Writer) {
 		key := field.Name
 		stringVal := readStringFromValue(val)
 
-		if shouldBeMasked(key) {
+		if shouldBeMasked(field) {
 			stringVal = fmt.Sprintf("[Masked - Length: %d]", len(stringVal))
 		}
 
@@ -285,18 +285,16 @@ func checkForEmptyRequiredFields(targetConfig any) error {
 	return nil
 }
 
-// shouldBeMasked returns true if key contains any of the key words
-func shouldBeMasked(key string) bool {
-	uppedKey := strings.ToUpper(key)
-
-	if strings.HasSuffix(uppedKey, "PASSWORD") ||
-		strings.HasSuffix(uppedKey, "TOKEN") ||
-		strings.HasSuffix(uppedKey, "API_KEY") ||
-		strings.HasSuffix(uppedKey, "SECRET") {
-		return true
+// shouldBeMasked returns true if the field has a "mask" tag
+func shouldBeMasked(field reflect.StructField) bool {
+	maskTag, hasMaskTag := field.Tag.Lookup("mask")
+	if !hasMaskTag {
+		return false
 	}
 
-	return false
+	boolVal, _ := strconv.ParseBool(maskTag)
+
+	return boolVal
 }
 
 // isRequiredField checks if field has a tag "req" and returns true only
