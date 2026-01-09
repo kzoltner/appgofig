@@ -20,7 +20,7 @@ var configDescriptions map[string]string = map[string]string{
 func main() {
 	cfg := &Config{}
 
-	if err := appgofig.ReadConfig(cfg, appgofig.EnvThenYaml); err != nil {
+	if err := appgofig.ReadConfig(cfg, appgofig.ReadModeEnvThenYaml); err != nil {
 		log.Fatal(err)
 	}
 

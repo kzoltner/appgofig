@@ -13,10 +13,10 @@ import (
 type ConfigReadMode string
 
 const (
-	EnvOnly     ConfigReadMode = "env-only"
-	YamlOnly    ConfigReadMode = "yaml-only"
-	EnvThenYaml ConfigReadMode = "env-yaml"
-	YamlThenEnv ConfigReadMode = "yaml-env"
+	ReadModeEnvOnly     ConfigReadMode = "env-only"
+	ReadModeYamlOnly    ConfigReadMode = "yaml-only"
+	ReadModeEnvThenYaml ConfigReadMode = "env-yaml"
+	ReadModeYamlThenEnv ConfigReadMode = "yaml-env"
 )
 
 // ReadConfig takes your targetConfig struct, applies defaults and then applies values according to the readMode
@@ -39,17 +39,17 @@ func ReadConfig(targetConfig any, readMode ConfigReadMode) error {
 
 	// read the config according to the read mode
 	switch readMode {
-	case EnvOnly:
+	case ReadModeEnvOnly:
 		// Only read from environment
 		if err := applyEnvironmentToConfig(targetConfig); err != nil {
 			return fmt.Errorf("could not read config values from env: %w", err)
 		}
-	case YamlOnly:
+	case ReadModeYamlOnly:
 		// Only read from yaml file
 		if err := applyYamlToConfig(targetConfig); err != nil {
 			return fmt.Errorf("could not read config values from yaml: %w", err)
 		}
-	case EnvThenYaml:
+	case ReadModeEnvThenYaml:
 		// first read from environment, then overwrite existing stuff with yaml
 		if err := applyEnvironmentToConfig(targetConfig); err != nil {
 			return fmt.Errorf("could not read config values from env: %w", err)
@@ -57,7 +57,7 @@ func ReadConfig(targetConfig any, readMode ConfigReadMode) error {
 		if err := applyYamlToConfig(targetConfig); err != nil {
 			return fmt.Errorf("could not read config values from yaml: %w", err)
 		}
-	case YamlThenEnv:
+	case ReadModeYamlThenEnv:
 		// first read from yaml, then overwrite existing stuff from environment
 		if err := applyYamlToConfig(targetConfig); err != nil {
 			return fmt.Errorf("could not read config values from yaml: %w", err)

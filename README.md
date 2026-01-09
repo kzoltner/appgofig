@@ -75,10 +75,10 @@ There are four read modes available:
 
 | ReadMode                     | Description                                                          |
 | ---------------------------- | -------------------------------------------------------------------- |
-| `ConfigReadMode.EnvOnly`     | Only uses environment to read values                                 |
-| `ConfigReadMode.YamlOnly`    | Only use yaml file                                                   |
-| `ConfigReadMode.EnvThenYaml` | First read env, then apply yaml (overwriting env values if present)  |
-| `ConfigReadMode.YamlThenEnv` | First read yaml, then apply env (overwriting yaml values if present) |
+| `appgofig.ReadModeEnvOnly`     | Only uses environment to read values                                 |
+| `appgofig.ReadModeYamlOnly`    | Only use yaml file                                                   |
+| `appgofig.ReadModeEnvThenYaml` | First read env, then apply yaml (overwriting env values if present)  |
+| `appgofig.ReadModeYamlThenEnv` | First read yaml, then apply env (overwriting yaml values if present) |
 
 # Documentation
 Two methods are provided to automatically create documentation about your configuration.
