@@ -108,7 +108,7 @@ defaultYamlPaths := []string{"config.yml", "config.yaml", "config/config.yml", "
 Two methods are provided to automatically create documentation about your configuration.
 Check the `example` folder for how they could look like.
 
-## Markdown
+### Markdown
 
 Using `WriteToMarkdownFile()` you can generate a markdown file containing a simple table.
 
@@ -118,7 +118,7 @@ if err := appgofig.WriteToMarkdownFile(cfg, configDescriptions, "example/Markdow
 }
 ```
 
-## Example config.yaml
+### Example config.yaml
 
 Similarly, using `WriteToYamlExampleFile()` will get you a config.yml example with comments explaining each entry
 
