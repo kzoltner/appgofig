@@ -2,39 +2,118 @@ package appgofig
 
 import (
 	"fmt"
-	"log"
+	"io"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// NewAppGofig Creates a new AppGofig. You need to Initialize it using .Init() on the return value
-func NewAppGofig[T StructOnly](configDescriptions map[string]string) (*AppGofig[T], error) {
-	configType := reflect.TypeFor[T]()
+type ConfigReadMode string
 
-	if configType.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("incompatible type for config")
+const (
+	EnvOnly     ConfigReadMode = "env-only"
+	YamlOnly    ConfigReadMode = "yaml-only"
+	EnvThenYaml ConfigReadMode = "env-yaml"
+	YamlThenEnv ConfigReadMode = "yaml-env"
+)
+
+// ReadConfig takes your targetConfig struct, applies defaults and then applies values according to the readMode
+func ReadConfig(targetConfig any, readMode ConfigReadMode) error {
+	if targetConfig == nil {
+		return fmt.Errorf("targetConfig must not be nil")
 	}
 
-	configInstance := reflect.New(configType).Elem().Interface().(T)
-
-	gofig := AppGofig[T]{
-		Descriptions: configDescriptions,
-		Cfg:          &configInstance,
+	if v := reflect.ValueOf(targetConfig); v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("targetConfig has to point to a struct")
 	}
 
-	return &gofig, nil
+	// check if only the supported config types are present
+	if err := onlyContainsSupportedTypes(targetConfig); err != nil {
+		return fmt.Errorf("targetConfig not valid: %w", err)
+	}
+
+	// apply the default values first
+	applyDefaultsToConfig(targetConfig)
+
+	// read the config according to the read mode
+	switch readMode {
+	case EnvOnly:
+		// Only read from environment
+		if err := applyEnvironmentToConfig(targetConfig); err != nil {
+			return fmt.Errorf("could not read config values from env: %w", err)
+		}
+	case YamlOnly:
+		// Only read from yaml file
+		if err := applyYamlToConfig(targetConfig); err != nil {
+			return fmt.Errorf("could not read config values from yaml: %w", err)
+		}
+	case EnvThenYaml:
+		// first read from environment, then overwrite existing stuff with yaml
+		if err := applyEnvironmentToConfig(targetConfig); err != nil {
+			return fmt.Errorf("could not read config values from env: %w", err)
+		}
+		if err := applyYamlToConfig(targetConfig); err != nil {
+			return fmt.Errorf("could not read config values from yaml: %w", err)
+		}
+	case YamlThenEnv:
+		// first read from yaml, then overwrite existing stuff from environment
+		if err := applyYamlToConfig(targetConfig); err != nil {
+			return fmt.Errorf("could not read config values from yaml: %w", err)
+		}
+		if err := applyEnvironmentToConfig(targetConfig); err != nil {
+			return fmt.Errorf("could not read config values from env: %w", err)
+		}
+	default:
+		return fmt.Errorf("invalid read mode %s", readMode)
+	}
+
+	// check if all required keys are non-empty
+	if err := checkForEmptyRequiredFields(targetConfig); err != nil {
+		return fmt.Errorf("missing required fields: %w", err)
+	}
+
+	return nil
+}
+
+// LogToConsole logs the actual configuration to the console
+func LogConfig(targetConfig any, out io.Writer) {
+	fmt.Fprint(out, "### AppGofig Configuration Start ###\n")
+
+	t := reflect.TypeOf(targetConfig).Elem()
+	v := reflect.ValueOf(targetConfig).Elem()
+
+	for k := 0; k < t.NumField(); k++ {
+		field := t.Field(k)
+		val := v.Field(k)
+
+		key := field.Name
+		stringVal := readStringFromValue(val)
+
+		if shouldBeMasked(key) {
+			stringVal = fmt.Sprintf("[Masked - Length: %d]", len(stringVal))
+		}
+
+		fmt.Fprintf(out, "#| %s : %s\n", key, stringVal)
+	}
+
+	fmt.Fprint(out, "### AppGofig Configuration End ###\n")
 }
 
 // CreateMarkdownFile creates a simple markdown table with information about the provided config inputs
-func CreateMarkdownFile[T StructOnly](markdownFilePath string, configDescriptions map[string]string) error {
+func WriteToMarkdownFile(targetConfig any, configDescriptions map[string]string, markdownFilePath string) error {
 	var sb strings.Builder
+
+	currentTimeString := time.Now().Format(time.RFC3339)
+
+	sb.WriteString("# Default Configuration\n")
+	fmt.Fprintf(&sb, "*Generated %s*\n\n", currentTimeString)
 
 	sb.WriteString("| YAML Key | ENV Key | Type | Required | Default | Description |\n")
 	sb.WriteString("|---|---|---|---|---|---|\n")
 
-	t := reflect.TypeFor[T]()
+	t := reflect.TypeOf(targetConfig).Elem()
 	for k := 0; k < t.NumField(); k++ {
 		field := t.Field(k)
 		yamlKey := field.Name
@@ -44,7 +123,7 @@ func CreateMarkdownFile[T StructOnly](markdownFilePath string, configDescription
 		description := configDescriptions[yamlKey]
 
 		required := "no"
-		if field.Tag.Get("req") == "true" {
+		if isRequiredField(field) {
 			required = "yes"
 		}
 
@@ -56,6 +135,7 @@ func CreateMarkdownFile[T StructOnly](markdownFilePath string, configDescription
 	if err != nil {
 		return fmt.Errorf("unable to create config markdown file (%q): %w", markdownFilePath, err)
 	}
+	defer markdownFile.Close()
 
 	if _, err := markdownFile.WriteString(sb.String()); err != nil {
 		return fmt.Errorf("unable to write to config markdown file (%q): %w", markdownFilePath, err)
@@ -65,15 +145,15 @@ func CreateMarkdownFile[T StructOnly](markdownFilePath string, configDescription
 }
 
 // CreateYamlExampleFile creates an example yaml file with comments providing the description and applied defaults
-func CreateYamlExampleFile[T StructOnly](yamlExampleFilePath string, configDescriptions map[string]string) error {
+func WriteToYamlExampleFile(targetConfig any, configDescriptions map[string]string, yamlExampleFilePath string) error {
 	var sb strings.Builder
 
 	currentTimeString := time.Now().Format(time.RFC3339)
 
 	sb.WriteString("# Autogenerated config.yml.example file. Please provide your own values here.\n")
-	fmt.Fprintf(&sb, "# Generated on %s \n\n", currentTimeString)
+	fmt.Fprintf(&sb, "# Generated %s \n\n", currentTimeString)
 
-	t := reflect.TypeFor[T]()
+	t := reflect.TypeOf(targetConfig).Elem()
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		yamlKey := field.Name
@@ -82,7 +162,7 @@ func CreateYamlExampleFile[T StructOnly](yamlExampleFilePath string, configDescr
 		description := configDescriptions[field.Name]
 
 		required := " - optional"
-		if field.Tag.Get("required") == "true" {
+		if isRequiredField(field) {
 			required = " - required"
 		}
 
@@ -95,6 +175,7 @@ func CreateYamlExampleFile[T StructOnly](yamlExampleFilePath string, configDescr
 	if err != nil {
 		return fmt.Errorf("unable to create example config yaml file (%q): %w", yamlExampleFilePath, err)
 	}
+	defer configExampleYaml.Close()
 
 	if _, err := configExampleYaml.WriteString(sb.String()); err != nil {
 		return fmt.Errorf("unable to write example config yaml to file (%q): %w", yamlExampleFilePath, err)
@@ -103,120 +184,71 @@ func CreateYamlExampleFile[T StructOnly](yamlExampleFilePath string, configDescr
 	return nil
 }
 
-// Init creates the AppGofig, reads env and yaml (in that order) and applies their values to appgofig.Cfg
-func (gofig *AppGofig[T]) Init() error {
-	// check config struct for errors
-	// TODO: Actually check for tags and stuff
-
-	// map config struct
-	configEntries := createConfigMap[T]()
-
-	// check for env
-	applyEnvConfigIfPresent(configEntries)
-
-	// check for yaml
-	if err := applyYamlConfigIfPresent(configEntries); err != nil {
-		return err
-	}
-
-	// apply config entries to .Cfg
-	if err := gofig.applyConfigEntries(configEntries); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// InitWithValues is similar to Init(), but does not read env or yaml - instead only using whats in values. Useful for testing.
-func (gofig *AppGofig[T]) InitWithTestValues(values map[string]string) error {
-	configEntries := createConfigMap[T]()
-
-	for key := range configEntries {
-		if newVal, ok := values[key]; ok {
-			configEntries[key].RawInput = newVal
-		}
-	}
-
-	if err := gofig.applyConfigEntries(configEntries); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// GetConfig returns the actual Config Struct
-func (gofig *AppGofig[T]) GetConfig() *T {
-	return gofig.Cfg
-}
-
-// LogToConsole logs the actual configuration to the console
-func (gofig *AppGofig[T]) LogToConsole() {
-	log.Println("### AppGofig Configuration Start ###")
-
-	t := reflect.TypeFor[T]()
-	v := reflect.ValueOf(gofig.Cfg).Elem()
+// onlyContainsSupportedTypes checks if only supported data types are present within targtConfig
+// if not, if returns an error describing the first non-valid field name
+// This method assumes targetConfig to already be a pointer to struct
+func onlyContainsSupportedTypes(targetConfig any) error {
+	t := reflect.TypeOf(targetConfig).Elem()
 
 	for k := 0; k < t.NumField(); k++ {
 		field := t.Field(k)
-		val := v.Field(k)
-
-		key := field.Name
-		stringVal := valueToString(val)
-
-		if ShouldBeMasked(key) {
-			stringVal = fmt.Sprintf("[Masked - Length: %d]", len(stringVal))
-		}
-
-		log.Printf("#| %s : %s\n", key, stringVal)
-	}
-
-	log.Println("### AppGofig Configuration End ###")
-}
-
-// applyConfigEntries takes the values in configInput and actually writes them to cfg
-func (gofig *AppGofig[T]) applyConfigEntries(configEntries map[string]*ConfigEntry) error {
-	// check if all required envs are non-empty
-	for key, entry := range configEntries {
-		if entry.IsRequired {
-			if len(configEntries[key].RawInput) == 0 {
-				return fmt.Errorf("required config key %q is empty", key)
-			}
-		}
-	}
-
-	// convert all non-empty or required keys to their type and set them
-	for key, entry := range configEntries {
-		if entry.IsRequired || len(configEntries[key].RawInput) != 0 {
-			// all required or non-empty keys need to match their type
-			val, err := stringToValue(entry.RawInput, entry.FieldType)
-			if err != nil {
-				return fmt.Errorf("invalid config value for key %q using input %q caused by: %w", key, entry.RawInput, err)
-			}
-
-			entry.Value = val
-		}
-	}
-	// set all values to config struct
-	confTypes := reflect.TypeFor[T]()
-	confValues := reflect.ValueOf(gofig.Cfg).Elem()
-
-	for k := 0; k < confTypes.NumField(); k++ {
-		field := confTypes.Field(k)
-		val := confValues.Field(k)
-
-		log.Println(val)
-
 		switch field.Type.Kind() {
-		case reflect.String:
-			val.SetString(configEntries[field.Name].Value.(string))
-		case reflect.Bool:
-			val.SetBool(configEntries[field.Name].Value.(bool))
-		case reflect.Int64:
-			val.SetInt(configEntries[field.Name].Value.(int64))
-		case reflect.Float64:
-			val.SetFloat(configEntries[field.Name].Value.(float64))
+		case reflect.String, reflect.Int64, reflect.Float64, reflect.Bool:
+			continue
+		default:
+			return fmt.Errorf("invalid type %s on field %s", field.Type.Kind(), field.Name)
 		}
 	}
 
 	return nil
+}
+
+// checkForEmptyRequiredFields returns an error if any field with req="true" tag has empty content
+func checkForEmptyRequiredFields(targetConfig any) error {
+	t := reflect.TypeOf(targetConfig).Elem()
+	v := reflect.ValueOf(targetConfig).Elem()
+
+	for k := 0; k < t.NumField(); k++ {
+		field := t.Field(k)
+		fieldVal := v.Field(k)
+		switch field.Type.Kind() {
+		case reflect.String:
+			// only a string can be "empty" after the strconv methods were applied
+			if isRequiredField(field) && len(fieldVal.String()) == 0 {
+				return fmt.Errorf("required field %s has length 0", field.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+// shouldBeMasked returns true if key contains any of the key words
+func shouldBeMasked(key string) bool {
+	uppedKey := strings.ToUpper(key)
+
+	if strings.HasSuffix(uppedKey, "PASSWORD") ||
+		strings.HasSuffix(uppedKey, "TOKEN") ||
+		strings.HasSuffix(uppedKey, "API_KEY") ||
+		strings.HasSuffix(uppedKey, "SECRET") {
+		return true
+	}
+
+	return false
+}
+
+// isRequiredField checks if field has a tag "req" and returns true only
+// if that req is ok for strconv.ParseBool being true, false otherwise
+func isRequiredField(field reflect.StructField) bool {
+	reqVal, ok := field.Tag.Lookup("req")
+
+	if !ok {
+		return false
+	}
+
+	if boolVal, err := strconv.ParseBool(reqVal); err != nil {
+		return false
+	} else {
+		return boolVal
+	}
 }

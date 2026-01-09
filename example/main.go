@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/kzoltner/appgofig"
 )
@@ -17,26 +18,16 @@ var configDescriptions map[string]string = map[string]string{
 }
 
 func main() {
-	// Creating the AppGofig itself
-	gofig, err := appgofig.NewAppGofig[Config](configDescriptions)
-	if err != nil {
+	cfg := &Config{}
+
+	if err := appgofig.ReadConfig(cfg, appgofig.EnvThenYaml); err != nil {
 		log.Fatal(err)
 	}
 
-	// Initialize it, which actually reads the values
-	if err := gofig.Init(); err != nil {
-		log.Fatal(err)
-	}
+	appgofig.LogConfig(cfg, os.Stdout)
 
-	// Get the config struct itself - this should be the same as your struct - but with values added
-	cfg := gofig.GetConfig()
 	log.Println(cfg.MyOwnSetting)
-	log.Println(cfg.MyStringSetting)
 
-	// printing actual (masked) config to console
-	gofig.LogToConsole()
-
-	// Documentation functions - can be integrated into automation to create Markdown/ExampleYaml
-	appgofig.CreateMarkdownFile[Config]("./example/MarkdownExample.md", configDescriptions)
-	appgofig.CreateYamlExampleFile[Config]("./example/ConfigYamlExample.yaml", configDescriptions)
+	appgofig.WriteToMarkdownFile(cfg, configDescriptions, "example/MarkdownExample.md")
+	appgofig.WriteToYamlExampleFile(cfg, configDescriptions, "example/ConfigYamlExample.yaml")
 }
