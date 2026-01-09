@@ -143,7 +143,7 @@ func applyStringToValue(field reflect.StructField, fieldVal reflect.Value, input
 		}
 
 		fieldVal.SetBool(boolVal)
-	case reflect.Int64:
+	case reflect.Int:
 		intVal, err := strconv.ParseInt(input, 0, 64)
 		if err != nil {
 			return fmt.Errorf("cannot use %s as int: %w", input, err)
@@ -168,7 +168,7 @@ func readStringFromValue(fieldVal reflect.Value) string {
 	switch fieldVal.Kind() {
 	case reflect.String:
 		return fieldVal.String()
-	case reflect.Int64:
+	case reflect.Int:
 		return strconv.FormatInt(fieldVal.Int(), 10)
 	case reflect.Float64:
 		return strconv.FormatFloat(fieldVal.Float(), 'f', -1, 64)

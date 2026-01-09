@@ -255,7 +255,7 @@ func onlyContainsSupportedTypes(targetConfig any) error {
 	for k := 0; k < t.NumField(); k++ {
 		field := t.Field(k)
 		switch field.Type.Kind() {
-		case reflect.String, reflect.Int64, reflect.Float64, reflect.Bool:
+		case reflect.String, reflect.Int, reflect.Float64, reflect.Bool:
 			continue
 		default:
 			return fmt.Errorf("invalid type %s on field %s", field.Type.Kind(), field.Name)

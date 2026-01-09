@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	MyOwnSetting    int64  `default:"42" env:"MY_OWN_SETTING"`
+	MyOwnSetting    int    `default:"42" env:"MY_OWN_SETTING"`
 	MyStringSetting string `default:"defaultStringSetting" env:"MY_STRING_SETTING" req:"true"`
 }
 
