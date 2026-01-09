@@ -69,16 +69,19 @@ func applyEnvironmentToConfig(targetConfig any) error {
 }
 
 // applyYamlToConfig checks for (config/)config.y(a)ml files and applies the first one found to targetConfig
-func applyYamlToConfig(targetConfig any) error {
-	// check for a config.yml or config.yaml in root directory or within a config folder
-	// any value here overwrites the rest
-	yamlPaths := []string{"config.yml", "config.yaml", "config/config.yml", "config/config.yaml"}
-
+func applyYamlToConfig(targetConfig any, yamlFile []string) error {
 	yamlFilePath := ""
-	for _, path := range yamlPaths {
-		if _, err := os.Stat(path); err == nil {
-			yamlFilePath = path
-			break
+	if len(yamlFile) > 0 {
+		yamlFilePath = yamlFile[0]
+	} else {
+		// check for a config.yml or config.yaml in root directory or within a config folder
+		// any value here overwrites the rest
+		defaultYamlPaths := []string{"config.yml", "config.yaml", "config/config.yml", "config/config.yaml"}
+		for _, path := range defaultYamlPaths {
+			if _, err := os.Stat(path); err == nil {
+				yamlFilePath = path
+				break
+			}
 		}
 	}
 

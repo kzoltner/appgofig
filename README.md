@@ -47,6 +47,20 @@ Now, using your config should be as easy as accessing the struct itself:
 log.Println(cfg.MyOwnSetting)
 ```
 
+# Using `yaml`
+The `ReadConfig()` method accepts a third parameter for you to specify a yaml file path to use:
+
+```go
+appgofig.ReadConfig(cfg, appgofig.ReadModeEnvThenYaml, "./my_yaml.yml")
+```
+
+More than one yaml path is not allowed.
+
+If no path is provided, these paths are used in order (first hit gets the win):
+```go
+defaultYamlPaths := []string{"config.yml", "config.yaml", "config/config.yml", "config/config.yaml"}
+```
+
 # The `Config` struct
 
 The `Config` struct determines your whole configuration. You can name it whatever you want.

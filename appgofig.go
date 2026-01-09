@@ -20,13 +20,22 @@ const (
 )
 
 // ReadConfig takes your targetConfig struct, applies defaults and then applies values according to the readMode
-func ReadConfig(targetConfig any, readMode ConfigReadMode) error {
+// Using yamlFile, you can specify a yaml file to read from. If not specified, one of ./(config/)config.y(a)ml is used
+func ReadConfig(targetConfig any, readMode ConfigReadMode, yamlFile ...string) error {
 	if targetConfig == nil {
 		return fmt.Errorf("targetConfig must not be nil")
 	}
 
 	if v := reflect.ValueOf(targetConfig); v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("targetConfig has to point to a struct")
+	}
+
+	if len(yamlFile) > 1 {
+		return fmt.Errorf("only one additional yaml file path is allowed.")
+	}
+
+	if len(yamlFile) == 1 && readMode == ReadModeEnvOnly {
+		return fmt.Errorf("in ReadModeEnvOnly, no additional yaml path is allowed.")
 	}
 
 	// check if only the supported config types are present
@@ -46,7 +55,7 @@ func ReadConfig(targetConfig any, readMode ConfigReadMode) error {
 		}
 	case ReadModeYamlOnly:
 		// Only read from yaml file
-		if err := applyYamlToConfig(targetConfig); err != nil {
+		if err := applyYamlToConfig(targetConfig, yamlFile); err != nil {
 			return fmt.Errorf("could not read config values from yaml: %w", err)
 		}
 	case ReadModeEnvThenYaml:
@@ -54,12 +63,12 @@ func ReadConfig(targetConfig any, readMode ConfigReadMode) error {
 		if err := applyEnvironmentToConfig(targetConfig); err != nil {
 			return fmt.Errorf("could not read config values from env: %w", err)
 		}
-		if err := applyYamlToConfig(targetConfig); err != nil {
+		if err := applyYamlToConfig(targetConfig, yamlFile); err != nil {
 			return fmt.Errorf("could not read config values from yaml: %w", err)
 		}
 	case ReadModeYamlThenEnv:
 		// first read from yaml, then overwrite existing stuff from environment
-		if err := applyYamlToConfig(targetConfig); err != nil {
+		if err := applyYamlToConfig(targetConfig, yamlFile); err != nil {
 			return fmt.Errorf("could not read config values from yaml: %w", err)
 		}
 		if err := applyEnvironmentToConfig(targetConfig); err != nil {
