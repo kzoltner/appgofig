@@ -47,7 +47,7 @@ Now, using your config should be as easy as accessing the struct itself:
 log.Println(cfg.MyOwnSetting)
 ```
 
-# Using `yaml`
+## Using `yaml`
 The `ReadConfig()` method accepts a third parameter for you to specify a yaml file path to use:
 
 ```go
@@ -61,7 +61,7 @@ If no path is provided, these paths are used in order (first hit gets the win):
 defaultYamlPaths := []string{"config.yml", "config.yaml", "config/config.yml", "config/config.yaml"}
 ```
 
-# The `Config` struct
+## The `Config` struct
 
 The `Config` struct determines your whole configuration. You can name it whatever you want.
 The following tags are usable:
@@ -83,7 +83,7 @@ type Config struct {
 > [!important]
 > Due to my own needs, only four types are allowed: `string`, `int64`, `float64` and `bool`.
 
-# ReadModes
+## ReadModes
 
 There are four read modes available:
 
