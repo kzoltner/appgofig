@@ -2,7 +2,7 @@
 
 ![Coverage](https://codecov.io/gh/kzoltner/appgofig/branch/main/graph/badge.svg)
 
-Using a struct (and one description map) as single source of truth to add configuration to Go applications.
+Using a struct (and one optional description map) as single source of truth to add configuration to Go applications.
 
 > [!note]
 > This is a very simplistic approach to adding simple key:value pair style configuration to your applications. Nothing more, nothing less.
@@ -21,7 +21,7 @@ First, create your Config and your ConfigDescriptions (optional, only needed for
 
 ```go
 type Config struct {
-	MyOwnSetting    int64  `default:"10" env:"MY_OWN_SETTING"`
+	MyOwnSetting    int  `default:"10" env:"MY_OWN_SETTING"`
 	MyStringSetting string `default:"hello" env:"MY_STRING_SETTING" req:"true"`
 }
 
@@ -68,12 +68,12 @@ Example entry:
 
 ```go
 type Config struct {
-	MyOwnSetting string `env:"ENV_MY_OWN_SETTING" default:"myDefaultValue" req:"true"`
+	MyOwnSetting string `env:"ENV_MY_OWN_SETTING" default:"myDefaultValue" req:"true" mask:"true"`
 }
 ```
 
 > [!important]
-> Due to my own needs, only four types are allowed: `string`, `int64`, `float64` and `bool`.
+> Due to my own needs, only four types are allowed: `string`, `int`, `float64` and `bool`.
 
 ## Available Options
 
@@ -94,7 +94,7 @@ There are four read modes available:
 | ------------------------------ | -------------------------------------------------------------------- |
 | `appgofig.ReadModeEnvOnly`     | Only uses Environment to read values                                 |
 | `appgofig.ReadModeYamlOnly`    | Only uses a YAML file                                                |
-| `appgofig.ReadModeEnvThenYaml` | First read env, then apply YAML (overwriting env values if present)  |
+| `appgofig.ReadModeEnvThenYaml` | First read env, then apply YAML (overwriting env values if present). This is the default read mode.  |
 | `appgofig.ReadModeYamlThenEnv` | First read YAML, then apply env (overwriting YAML values if present) |
 
 ### Using yaml files
